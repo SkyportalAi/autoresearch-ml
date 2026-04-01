@@ -87,6 +87,9 @@ Only the experiment block at the top of `train.py` (lines between the
 - Do not optimize on the test set before finalization.
 - Do not reintroduce dropped columns listed in `program.md` (they are
   dropped for a reason documented there).
+- Do not read, run, or reference anything in the `tests/` directory. Those
+  files are for offline validation by the repo maintainer, not for your
+  search loop.
 
 ### Iteration steps
 
