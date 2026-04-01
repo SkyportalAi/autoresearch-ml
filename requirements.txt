@@ -1,0 +1,11 @@
+numpy
+pandas
+scikit-learn
+joblib
+xgboost
+lightgbm
+catboost
+# Optional:
+# mlflow
+# datasets
+# cuml-cu12  # or the version matching your CUDA stack, for GPU logistic/random_forest

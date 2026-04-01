@@ -1,0 +1,31 @@
+# Generated data bundles (created by prepare.py)
+bundles/
+
+# Experiment outputs and model artifacts (created by train.py)
+outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Environment
+.env
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# MLflow (if enabled)
+mlruns/
