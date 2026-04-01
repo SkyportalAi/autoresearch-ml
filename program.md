@@ -1,48 +1,16 @@
-# Program: <Your Task Title>
+# Program: Bank Marketing Campaign Prediction
 
 ## Business objective
 
-<!-- Describe what you are trying to predict and why. -->
+Predict whether a customer will subscribe to a term deposit based on direct marketing campaign data from a Portuguese banking institution. This helps optimize marketing efforts by identifying high-potential customers.
 
 ## Dataset
 
-<!-- Pick ONE source type and fill in the relevant fields. Delete the rest. -->
-
-### Option A: Built-in demo dataset
+### Built-in demo dataset
 
 - **source**: `demo`
-- **dataset_name**: `breast_cancer` or `bank_marketing`
-- **bundle_name**: `<your_bundle_name>`
-
-### Option B: Local CSV file
-
-- **source**: `csv`
-- **csv_path**: `/path/to/your/data.csv`
-- **bundle_name**: `<your_bundle_name>`
-- **target_column**: `<column_name>`
-- **positive_label**: `<value>` (only needed if target is not already 0/1)
-
-### Option C: Public URL (CSV or ZIP containing CSV)
-
-- **source**: `url`
-- **data_url**: `https://example.com/data.csv`
-- **bundle_name**: `<your_bundle_name>`
-- **target_column**: `<column_name>`
-- **positive_label**: `<value>`
-
-### Option D: Hugging Face dataset
-
-- **source**: `huggingface`
-- **hf_dataset**: `org/dataset-name`
-- **hf_split**: `train`
-- **bundle_name**: `<your_bundle_name>`
-- **target_column**: `<column_name>`
-- **positive_label**: `<value>`
-
-### Columns to drop (optional)
-
-- **drop_columns**: `<col1>`, `<col2>`
-- **drop_reason**: Explain why these columns should be excluded (e.g., leakage, ID columns).
+- **dataset_name**: `bank_marketing`
+- **bundle_name**: `bank_marketing`
 
 ## Model families to evaluate
 
@@ -53,17 +21,11 @@
 - `lightgbm`
 - `catboost`
 
-<!-- Remove any families you do not want the agent to evaluate. -->
-
 ## Primary metric
 
 `average_precision`
 
-<!-- Supported: average_precision, roc_auc, f1, accuracy, neg_log_loss -->
-
 ## Search constraints (optional, defaults shown)
-
-<!-- Only include lines you want to override. Omitted values use prepare.py defaults. -->
 
 - **max_total_trials**: `20`
 - **min_trials_per_family**: `3`
@@ -75,5 +37,3 @@
 ## Hardware (optional)
 
 - **preferred_backend**: `auto`
-
-<!-- Supported: auto, gpu, cpu -->
