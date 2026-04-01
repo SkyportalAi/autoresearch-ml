@@ -79,7 +79,7 @@ def patch_train_file(train_text: str, hypothesis: dict[str, Any]) -> str:
 def run_train(bundle_name: str, hardware_backend: str, finalize: bool = False) -> None:
     env = os.environ.copy()
     env['HARDWARE_BACKEND'] = hardware_backend
-    cmd = ['python', str(TRAIN_PATH), '--bundle-name', bundle_name]
+    cmd = ['python3', str(TRAIN_PATH), '--bundle-name', bundle_name]
     if finalize:
         cmd.append('--finalize')
     cp = subprocess.run(
