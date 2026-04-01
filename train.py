@@ -527,7 +527,8 @@ def write_local_result(output_dir: Path, payload: dict[str, Any]) -> None:
     merged.to_csv(results_path, sep='\t', index=False)
 
 
-def maybe_log_mlflow(mlflow_mod, payload: dict[str, Any], output_dir: Path):
+def maybe_log_mlflow(mlflow_mod, payload: dict[str, Any], output_dir: Path,
+                     metadata: dict[str, Any]):
     if mlflow_mod is None:
         return
     with mlflow_mod.start_run(run_name=payload['experiment_name']):
@@ -546,7 +547,18 @@ def maybe_log_mlflow(mlflow_mod, payload: dict[str, Any], output_dir: Path):
         })
         run_dir = output_dir / 'runs' / payload['run_id']
         mlflow_mod.log_artifact(str(run_dir / 'summary.json'))
-        mlflow_mod.log_artifact(str(run_dir / 'model.joblib'))
+
+        if payload.get('finalize') and payload.get('artifact_pipeline') is not None:
+            mlcfg = metadata.get('mlflow', {})
+            model_name = (mlcfg.get('registered_model_name')
+                          or f"autoresearch_{payload['bundle_name']}")
+            mlflow_mod.sklearn.log_model(
+                sk_model=payload['artifact_pipeline'],
+                artifact_path='model',
+                registered_model_name=model_name,
+            )
+        else:
+            mlflow_mod.log_artifact(str(run_dir / 'model.joblib'))
 
 
 def main() -> None:
@@ -637,7 +649,7 @@ def main() -> None:
         payload['val_metrics'] = metrics
 
     write_local_result(output_dir, payload)
-    maybe_log_mlflow(mlflow_mod, payload, output_dir)
+    maybe_log_mlflow(mlflow_mod, payload, output_dir, metadata)
 
     printable = {k: v for k, v in payload.items() if k != 'artifact_pipeline'}
     print(json.dumps(printable, indent=2))

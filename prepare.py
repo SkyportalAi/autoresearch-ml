@@ -56,6 +56,7 @@ class PrepareConfig:
     mlflow_enabled: bool
     mlflow_tracking_uri: Optional[str]
     mlflow_experiment_name: str
+    mlflow_model_name: Optional[str]
 
 
 def parse_args() -> PrepareConfig:
@@ -87,6 +88,8 @@ def parse_args() -> PrepareConfig:
     p.add_argument('--enable-mlflow', action='store_true')
     p.add_argument('--mlflow-tracking-uri', default=None)
     p.add_argument('--mlflow-experiment-name', default=None)
+    p.add_argument('--mlflow-model-name', default=None,
+                   help='Registered model name in MLflow Model Registry (default: autoresearch_<bundle_name>)')
     args = p.parse_args()
 
     target_column = args.target_column
@@ -136,6 +139,7 @@ def parse_args() -> PrepareConfig:
         mlflow_enabled=bool(args.enable_mlflow),
         mlflow_tracking_uri=args.mlflow_tracking_uri,
         mlflow_experiment_name=args.mlflow_experiment_name or f'skyportal_{args.bundle_name}',
+        mlflow_model_name=args.mlflow_model_name,
     )
 
 
@@ -338,6 +342,7 @@ def main() -> None:
             'enabled': cfg.mlflow_enabled,
             'tracking_uri': cfg.mlflow_tracking_uri,
             'experiment_name': cfg.mlflow_experiment_name,
+            'registered_model_name': cfg.mlflow_model_name,
         },
     }
     (bundle_dir / 'metadata.json').write_text(json.dumps(metadata, indent=2))
