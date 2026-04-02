@@ -17,8 +17,13 @@ tabular binary classification task.
 Before starting the search loop, check whether the bundle exists at
 `bundles/<bundle_name>/` where `<bundle_name>` comes from `program.md`.
 
-If the bundle does not exist, create it by running `prepare.py` with the
-values from `program.md` mapped to CLI arguments as follows:
+If the bundle does not exist, create it by running:
+
+```
+python3 prepare.py --source <source> --bundle-name <bundle_name> [additional args from program.md]
+```
+
+Map values from `program.md` to CLI arguments as follows:
 
 | program.md field                    | prepare.py argument                    |
 |-------------------------------------|----------------------------------------|
