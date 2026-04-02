@@ -62,8 +62,7 @@ After running prepare.py, verify the bundle was created and read
 
 1. Probe the machine with `nvidia-smi` if available.
 2. Set the `HARDWARE_BACKEND` environment variable:
-   - `gpu` — strict GPU mode, fail if no GPU
-   - `auto` — use GPU if present, CPU fallback allowed
+   - `gpu` — strict GPU mode, fail if no GPU. Note: GPU must be used if GPU is available. Do not fall back to CPU. Install whatever package is required to use the GPU.
    - `cpu` — force CPU, for local smoke tests only
 3. If GPU is available but GPU-specific packages are missing (cuml, xgboost
    with CUDA support, lightgbm with GPU, catboost with GPU), install the
@@ -269,3 +268,4 @@ first, then `depth`, then `l2_leaf_reg`.
 5. **Threshold config**: Default `best_f1` strategy optimizes the
    classification threshold on validation data. This is usually fine.
    Only switch to `fixed` if there is a specific business threshold.
+
