@@ -91,20 +91,54 @@ Only the experiment block at the top of `train.py` (lines between the
   files are for offline validation by the repo maintainer, not for your
   search loop.
 
+### Mandatory search loop
+
+You MUST run a full iterative search loop. This is not optional. Do not
+stop after one run, after baselines, or after a few iterations because a
+result "looks good." The search is governed by termination conditions
+defined in `bundles/<bundle_name>/metadata.json` under `trial_policy`.
+Read these values before your first experiment and enforce them strictly.
+
+**Before starting:** Read `metadata.json` and note these values:
+- `max_total_trials` — you must keep running experiments until you hit this
+  limit OR one of the early-stopping conditions below fires.
+- `min_trials_per_family` — every model family gets at least this many runs
+  before it can be pruned.
+- `max_trials_per_family` — no family gets more than this many runs.
+- `max_consecutive_non_improvements` — stop a family (or the entire search)
+  after this many consecutive trials with no improvement.
+- `min_improvement` — gains smaller than this count as non-improvements.
+
+**You stop ONLY when one of these conditions is true:**
+1. You have reached `max_total_trials` total experiments.
+2. The overall best has not improved for `max_consecutive_non_improvements`
+   consecutive trials across all families AND every family has had at least
+   `min_trials_per_family` experiments.
+3. Every family has been pruned (each hit its own
+   `max_consecutive_non_improvements` or `max_trials_per_family`).
+
+If none of these conditions are met, you MUST continue running experiments.
+Count your trials. After each run, check the conditions above. If they are
+not met, run another experiment.
+
 ### Iteration steps
+
+For each experiment in the loop:
 
 1. Read `outputs/<bundle_name>/results.tsv` and `last_run.json` to see all
    prior results.
-2. Decide the next hypothesis based on the search policy and prior results.
-3. Edit only the experiment block at the top of `train.py`.
-4. Run: `HARDWARE_BACKEND=<value> python train.py --bundle-name <bundle_name>`
-5. Read the output and compare the new primary metric value to:
+2. Count total trials so far. Check if any termination condition is met.
+   If not, continue.
+3. Decide the next hypothesis based on the search strategy and prior results.
+4. Edit only the experiment block at the top of `train.py`.
+5. Run: `HARDWARE_BACKEND=<value> python train.py --bundle-name <bundle_name>`
+6. Read the output and compare the new primary metric value to:
    - best result for this model family
    - best result overall
-6. Record your reasoning: what you tried, what improved, what did not.
-7. Repeat until the search policy termination conditions are met.
+7. Record your reasoning: what you tried, what improved, what did not.
+8. Go back to step 1.
 
-### Search policy
+### Search strategy
 
 - Baseline every model family listed in `program.md` at least once with
   default parameters before tuning any family.
@@ -112,13 +146,10 @@ Only the experiment block at the top of `train.py` (lines between the
   pruning it.
 - Stop allocating trials to a family if it hits
   `max_consecutive_non_improvements` without beating its own best.
-- Stop the entire search when `max_total_trials` is reached.
-- Stop early if the overall best has not improved for
-  `max_consecutive_non_improvements` consecutive trials across all families.
 - Prefer simpler configurations when the primary metric gain is smaller
   than `min_improvement`.
 - Track best-per-family and best-overall throughout.
-- Read all numeric limits from `bundles/<bundle_name>/metadata.json`
+- All numeric limits come from `bundles/<bundle_name>/metadata.json`
   under `trial_policy`. These are authoritative — they override any
   hardcoded assumptions.
 
