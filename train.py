@@ -590,7 +590,7 @@ def main() -> None:
         experiment_name = EXPERIMENT_NAME
 
     run_id = f"{int(time.time())}_{uuid.uuid4().hex[:8]}"
-    timestamp = pd.Timestamp.utcnow().isoformat()
+    timestamp = pd.Timestamp.now('UTC').isoformat()
 
     fit_df = pd.concat([train_df, val_df], ignore_index=True) if args.finalize else train_df
     eval_df = test_df if args.finalize else val_df
