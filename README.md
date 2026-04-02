@@ -51,7 +51,7 @@ predict.py          Score new data with the finalized winning model.
 ### 1. Reset to a clean state (if starting fresh)
 
 ```bash
-python reset.py --program
+python3 reset.py --program
 ```
 
 This resets `train.py` to its default experiment block and `program.md` to
@@ -111,7 +111,7 @@ The agent reads `program.md` and `agentic/prompt.md`, then:
 ### 4. Score new data (optional)
 
 ```bash
-python predict.py --bundle-name <bundle_name> --csv-path new_data.csv --save-path scored.csv
+python3 predict.py --bundle-name <bundle_name> --csv-path new_data.csv --save-path scored.csv
 ```
 
 ## Supported model families
@@ -167,8 +167,8 @@ After a research run, `train.py` contains the winning model's configuration
 task on a different dataset:
 
 ```bash
-python reset.py              # reset train.py experiment block only
-python reset.py --program    # also reset program.md to the blank template
+python3 reset.py              # reset train.py experiment block only
+python3 reset.py --program    # also reset program.md to the blank template
 ```
 
 This surgically resets only the experiment block between the `===` markers

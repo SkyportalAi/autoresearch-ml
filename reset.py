@@ -6,8 +6,8 @@ Do NOT run this during an active search loop — it would erase the agent's
 current best configuration.
 
 Usage:
-    python reset.py              # reset train.py only
-    python reset.py --program    # also reset program.md to the blank template
+    python3 reset.py              # reset train.py only
+    python3 reset.py --program    # also reset program.md to the blank template
 """
 from __future__ import annotations
 

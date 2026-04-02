@@ -131,7 +131,7 @@ For each experiment in the loop:
    If not, continue.
 3. Decide the next hypothesis based on the search strategy and prior results.
 4. Edit only the experiment block at the top of `train.py`.
-5. Run: `HARDWARE_BACKEND=<value> python train.py --bundle-name <bundle_name>`
+5. Run: `HARDWARE_BACKEND=<value> python3 train.py --bundle-name <bundle_name>`
 6. Read the output and compare the new primary metric value to:
    - best result for this model family
    - best result overall
@@ -158,7 +158,7 @@ For each experiment in the loop:
 When the search is complete and the winner is clear:
 
 1. Set the experiment block in `train.py` to the winning configuration.
-2. Run: `HARDWARE_BACKEND=<value> python train.py --bundle-name <bundle_name> --finalize`
+2. Run: `HARDWARE_BACKEND=<value> python3 train.py --bundle-name <bundle_name> --finalize`
 3. This retrains on train+val combined and evaluates on the held-out test set.
 4. Report the final test metrics as the result of the research.
 
