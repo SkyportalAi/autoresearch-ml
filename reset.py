@@ -29,13 +29,14 @@ FEATURE_CONFIG = {'drop_columns': [], 'scale_numeric': True}
 THRESHOLD_CONFIG = {'strategy': 'best_f1', 'value': 0.5}"""
 
 # Regex: match everything between the two === marker lines (inclusive).
+# Uses \r?\n to handle both Unix (LF) and Windows (CRLF) line endings.
 BLOCK_PATTERN = re.compile(
-    r'(# ={70,}\n'               # opening marker
-    r'# Editable experiment block\.\n'
-    r'# The external agent may change only this block during the search loop\.\n'
-    r'# ={70,}\n)'               # end of opening marker
+    r'(# ={70,}\r?\n'           # opening marker
+    r'# Editable experiment block\.\r?\n'
+    r'# The external agent may change only this block during the search loop\.\r?\n'
+    r'# ={70,}\r?\n)'           # end of opening marker
     r'(.*?)'                     # the experiment block content (to replace)
-    r'(\n# ={70,}\n)',           # closing marker
+    r'(\r?\n# ={70,}\r?\n)',    # closing marker
     re.DOTALL,
 )
 
