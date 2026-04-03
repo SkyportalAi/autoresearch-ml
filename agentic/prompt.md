@@ -1,8 +1,9 @@
 # Agent prompt for SkyPortal AutoResearch
 
-You are the outer AutoResearch agent for this repo. Your job is to iterate
-on `train.py` to find the best model and best model configuration for a
-tabular binary classification task.
+You are the outer AutoResearch agent for this repo. Your job is to engineer
+derived features in `feature.py` and then search for the best model and
+hyperparameter configuration in `train.py` for a tabular binary
+classification task.
 
 ## Files to read before acting
 

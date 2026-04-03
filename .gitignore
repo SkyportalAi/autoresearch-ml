@@ -1,3 +1,6 @@
+# Claude Code
+.claude/
+
 # Generated data bundles (created by prepare.py)
 bundles/
 

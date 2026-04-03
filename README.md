@@ -6,12 +6,14 @@ applies the same pattern to **classical machine learning on tabular data**.
 
 Instead of tuning LLM hyperparameters, this repo lets a data scientist
 define a business objective (e.g., predict customer churn, score fraud risk),
-point it at a dataset, and choose which model families to evaluate. An LLM
-agent then takes over — systematically exploring the hyperparameter
-configuration space across all selected models, running experiments,
-comparing results, and narrowing down to the single best model with its
-best configuration. The data scientist defines *what* to solve and *which
-models* to consider; the agent figures out the *how*.
+point it at a dataset, provide business context about the features, and
+choose which model families to evaluate. An LLM agent then takes over —
+first engineering derived features using business domain knowledge, then
+systematically searching the model and hyperparameter space, running
+experiments, comparing results, and narrowing down to the single best
+model with its best configuration. The data scientist defines *what* to
+solve, provides domain context, and selects *which models* to consider;
+the agent figures out the *how* — from feature creation to final tuning.
 
 Supported model families: logistic regression, random forest, extra trees,
 XGBoost, LightGBM, and CatBoost — with GPU acceleration where available
@@ -20,7 +22,9 @@ and automatic CPU fallback.
 ## How it works
 
 ```
-program.md          The data scientist fills in the task: dataset, metric, models.
+program.md          The data scientist fills in the task: dataset, metric, models,
+    +               and business context (churn drivers, domain knowledge, hints).
+feature.md          Column-level documentation: what each feature means, quirks.
     |
     v
 prompt.md           The agent reads its operating instructions and guardrails.
@@ -29,8 +33,15 @@ prompt.md           The agent reads its operating instructions and guardrails.
 prepare.py          The agent runs this once to create an immutable data bundle.
     |
     v
-train.py            The agent edits the experiment block, runs, reads results,
-    |               and repeats for up to max_total_trials iterations.
+feature.py          Phase 2: The agent engineers derived features — ratios,
+    |               interactions, domain flags — guided by business context
+    |               in program.md and column docs in feature.md. Iterates
+    |               with a fixed LightGBM testbed until features stabilize.
+    |
+    v
+train.py            Phase 3: The agent searches across model families, tuning
+    |               hyperparameters. Edits the experiment block, runs, reads
+    |               results, and repeats for up to max_total_trials iterations.
     v
 predict.py          Score new data with the finalized winning model.
 ```
@@ -39,12 +50,14 @@ predict.py          Score new data with the finalized winning model.
 
 | File | Role | Who edits it |
 |------|------|--------------|
-| `program.md` | Task definition: dataset, metric, models, constraints | You (the data scientist) |
-| `agentic/prompt.md` | Agent instructions: how to run prepare.py, search policy, model tuning guidance | Repo maintainer |
+| `program.md` | Task definition: dataset, metric, models, business context, domain knowledge | You (the data scientist) |
+| `feature.md` | Column-level documentation: what each feature means, data types, quirks | You (the data scientist) |
+| `agentic/prompt.md` | Agent instructions: feature engineering protocol, search policy, model tuning guidance | Repo maintainer |
 | `prepare.py` | Data preparation harness: loads data, splits, writes bundle | Nobody during search |
-| `train.py` | Single-experiment trainer with an editable config block at the top | The agent (experiment block only) |
-| `predict.py` | Score new data with a finalized model | Run manually after research |
-| `reset.py` | Reset train.py and program.md to clean starting state | You (between research tasks) |
+| `feature.py` | Feature engineering function with agent-editable section | The agent (Phase 2) |
+| `train.py` | Single-experiment trainer with an editable config block at the top | The agent (Phase 3) |
+| `predict.py` | Score new data with a finalized model (applies feature engineering) | Run manually after research |
+| `reset.py` | Reset train.py, feature.py, and program.md to clean starting state | You (between research tasks) |
 
 ## Quick start
 
@@ -57,9 +70,19 @@ python3 reset.py --program
 This resets `train.py` to its default experiment block and `program.md` to
 the blank template. Run this before starting a new research task.
 
-### 2. Fill in program.md
+### 2. Fill in program.md and feature.md
 
-Open `program.md` and fill in your task. Pick a data source:
+Open `program.md` and fill in your task. Beyond the dataset and model
+configuration, include **business context** — what drives the target
+variable, known high-risk profiles, and hints for feature engineering.
+The richer your domain knowledge, the better the agent's feature
+engineering will be.
+
+Open `feature.md` and document each column: what it represents, its data
+type, encoding quirks (e.g., "stored as string, needs conversion"), and
+any domain-specific meaning of special values.
+
+Pick a data source:
 
 **Built-in demo dataset:**
 ```markdown
@@ -101,11 +124,17 @@ optionally adjust search constraints. See the template comments for details.
 
 ### 3. Point your agent at the repo
 
-The agent reads `program.md` and `agentic/prompt.md`, then:
+The agent reads `program.md`, `feature.md`, and `agentic/prompt.md`, then:
 
 1. Runs `prepare.py` to create the data bundle (if it doesn't exist)
-2. Baselines every model family with default hyperparameters
-3. Tunes the top families by editing `train.py`'s experiment block
+2. **Phase 2 — Feature engineering**: Reads business context from
+   `program.md` and column docs from `feature.md`, then iteratively
+   builds derived features in `feature.py` (ratios, interactions,
+   domain flags, transforms). Uses LightGBM as a fixed testbed to
+   isolate the effect of features. Iterates until features stabilize.
+3. **Phase 3 — Model search**: Baselines every model family, then tunes
+   the top families by editing `train.py`'s experiment block. All
+   families are tested with the locked feature set from Phase 2.
 4. Finalizes the winner on the held-out test set
 
 ### 4. Score new data (optional)
@@ -162,18 +191,19 @@ Override defaults via `program.md` or CLI args to `prepare.py`.
 
 ## Resetting between tasks
 
-After a research run, `train.py` contains the winning model's configuration
-(committed by the agent as part of its search loop). Before starting a new
-task on a different dataset:
+After a research run, `train.py` and `feature.py` contain the winning
+configuration and engineered features. Before starting a new task on a
+different dataset:
 
 ```bash
-python3 reset.py              # reset train.py experiment block only
+python3 reset.py              # reset train.py experiment block and feature.py
 python3 reset.py --program    # also reset program.md to the blank template
 ```
 
-This surgically resets only the experiment block between the `===` markers
-in `train.py` — the rest of the file is untouched. It does not delete
-`bundles/` or `outputs/` (these are namespaced by bundle name and gitignored).
+This surgically resets only the editable sections between the `===` markers
+in `train.py` and `feature.py` — the rest of the files are untouched. It
+does not delete `bundles/` or `outputs/` (these are namespaced by bundle
+name and gitignored).
 
 ## Outputs
 
