@@ -1,50 +1,55 @@
-# Program: Telecom Customer Churn — Proactive Retention Campaign
+# Program: Credit Card Default Prediction
 
 ## Business objective
 
-Predict which customers are most likely to churn so our retention team can run a **proactive outreach campaign**. Marketing has budget to target ~20% of the customer base with tailored retention offers (discounted upgrades, loyalty credits, dedicated support). We need to **rank customers by churn risk** — it's more important to get the ranking right than to get a hard yes/no threshold.
+Predict which credit card customers will default on their next month's payment. The bank's collections team needs to **rank customers by default risk** to prioritize outreach — calling the highest-risk customers first reduces losses. Ranking quality matters more than a hard yes/no threshold.
 
 ## Business context and domain knowledge
 
-Churn in telecom is NOT random. It clusters around specific customer profiles and lifecycle moments. Years of operational experience have identified these patterns:
+Credit card default is driven by a combination of financial stress, behavioral patterns, and customer demographics. The dataset contains 6 months of payment history (April-September 2005) for 30,000 Taiwanese credit card holders.
 
-### Key churn drivers (in order of importance)
+### Key default drivers
 
-1. **Contract type**: Month-to-month customers churn at 5-8x the rate of contract customers. No cancellation penalty = no friction. But a month-to-month customer who has stayed 24+ months is actually very loyal — they stay by choice.
+1. **Payment delay history**: The single strongest predictor. A customer who has been 2+ months late in recent months is far more likely to default than one who pays on time. Recent delays (PAY_0, the most recent month) matter more than older delays (PAY_6).
 
-2. **Tenure lifecycle**: Churn follows a bathtub curve — very high in first 6 months (buyer's remorse, competitor offers), drops through months 12-48 (habitual usage), slight rise at 48+ months (taken-for-granted effect). Surviving the first year is the critical milestone.
+2. **Trend in payment behavior**: A customer whose delays are *increasing* month over month (e.g., PAY_6=0, PAY_5=0, PAY_4=1, PAY_3=2) is actively deteriorating. A customer whose delays are *decreasing* is recovering. The slope of the payment delay over 6 months is more predictive than any single month.
 
-3. **Fiber optic paradox**: Fiber customers churn at ~2x the rate of DSL — not because fiber is bad, but because fiber plans cost more, fiber customers are tech-savvy comparison shoppers, and fiber markets have more competitors. DSL customers in rural areas often have no alternative.
+3. **Credit utilization**: How much of their credit limit they're using. A customer with BILL_AMT near LIMIT_BAL is maxed out — financially stressed. Low utilization suggests financial headroom.
 
-4. **Add-on lock-in**: Each add-on service (security, backup, protection, support) creates switching cost. Customers with 0 add-ons are using us as a "dumb pipe" — any cheaper competitor wins instantly. Going from 0 to 1 add-on matters more than 4 to 5.
+4. **Repayment ratio**: How much of the bill they actually pay each month (PAY_AMT / BILL_AMT). Customers who pay the minimum or less are high risk. Customers who pay in full are low risk. The ratio matters more than the absolute amounts.
 
-5. **Payment method signal**: Electronic check customers churn dramatically more than auto-pay customers. Electronic check = active monthly decision to pay = monthly opportunity to cancel. Auto-pay = invisible = inertia favors retention.
+5. **Repayment trend**: Is the customer paying a shrinking percentage of their bill each month? If PAY_AMT/BILL_AMT is declining over the 6 months, they're running out of capacity to pay.
 
-6. **Price-to-value ratio**: A customer paying $90/month with 5 add-ons is getting value. A customer paying $80/month with 0 add-ons feels overcharged. The absolute price matters less than what you get for it.
+6. **Demographics interact with behavior**: Young, less-educated customers with high utilization are highest risk. But demographics alone are weak predictors — they only matter in combination with payment behavior.
 
 ### Known high-risk profiles
 
-- **Unprotected Fiber User**: Fiber optic + no OnlineSecurity + no TechSupport + month-to-month. Premium price, zero lock-in, no support safety net.
-- **Solo New Customer**: tenure < 12, no Partner, no Dependents, month-to-month. Zero switching cost, still in "trial period" mentally.
-- **Price-Shocked Senior**: SeniorCitizen=1, high MonthlyCharges, electronic check. Price-sensitive, fixed income, active payment decision each month.
-- **Feature-Light Customer**: Internet service but zero add-ons across all 6 categories. Using us as a dumb pipe.
-- **Passive Downgrader**: Long tenure but current MonthlyCharges significantly higher than historical average (TotalCharges/tenure) — bill increased, resentment building.
+- **Spiral Defaulter**: PAY_0 >= 2 (2+ months late now), and delays have been increasing over the past 6 months. They're in a debt spiral.
+- **Maxed-Out Minimum Payer**: BILL_AMT close to LIMIT_BAL, and PAY_AMT << BILL_AMT consistently. They're paying minimums on a maxed card.
+- **Recent Shock**: Previously good payment history (PAY_3 through PAY_6 all -1 or 0) but recent deterioration (PAY_0 or PAY_2 >= 1). Something changed — job loss, medical event.
+- **Chronic Late Payer**: Moderate delays every month (PAY consistently 1-2) but never catches up. Always behind but not yet in full default.
 
 ### Feature engineering hints
 
-- Count of add-on services (0-6) is more predictive than any individual add-on
-- Contract type x tenure interaction captures the loyalty nuance
-- MonthlyCharges / (TotalCharges/tenure) reveals recent price changes — ratio > 1 means bill went up
-- Electronic check + month-to-month + fiber = triple threat for churn
-- The absence of internet service defines a distinct low-churn segment (phone-only customers)
+- **Payment delay trend**: Slope of [PAY_6, PAY_5, PAY_4, PAY_3, PAY_2, PAY_0] — is it rising (getting worse) or falling (improving)?
+- **Average delay**: Mean of PAY_0 through PAY_6 captures overall payment discipline
+- **Max delay**: The worst single-month delay in the 6-month window
+- **Utilization ratios**: BILL_AMT1/LIMIT_BAL (current), BILL_AMT6/LIMIT_BAL (6 months ago)
+- **Repayment ratios**: PAY_AMT1/BILL_AMT1 (how much of last bill was paid)
+- **Repayment trend**: Slope of [PAY_AMT6/BILL_AMT6, ..., PAY_AMT1/BILL_AMT1]
+- **Balance growth**: BILL_AMT1 - BILL_AMT6 (is their balance growing?)
+- **Payment consistency**: Std dev of PAY_AMT values (erratic payers are riskier)
+- **Months with any delay**: Count of months where PAY > 0
+- **SEX, EDUCATION, MARRIAGE are numeric-encoded categories**, not continuous values — treat them as categorical or create meaningful interaction terms
 
 ## Dataset
 
 - **source**: `huggingface`
-- **hf_dataset**: `scikit-learn/churn-prediction`
-- **bundle_name**: `telecom_churn`
-- **target_column**: `Churn`
-- **positive_label**: `Yes`
+- **hf_dataset**: `scikit-learn/credit-card-clients`
+- **bundle_name**: `credit_default`
+- **target_column**: `default.payment.next.month`
+- **positive_label**: `1`
+- **drop_columns**: `ID`
 
 ## Model families to evaluate
 
