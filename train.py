@@ -44,8 +44,8 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 # Editable experiment block.
 # The external agent may change only this block during the search loop.
 # ============================================================================
-EXPERIMENT_NAME = 'fe_catboost'
-EXPERIMENT_DESCRIPTION = 'R1 derived features + catboost'
+EXPERIMENT_NAME = 'winner_catboost'
+EXPERIMENT_DESCRIPTION = 'WINNER: CatBoost defaults + derived features, finalized on test set'
 MODEL_FAMILY = 'catboost'
 MODEL_PARAMS = {'depth': 6, 'iterations': 200, 'learning_rate': 0.05, 'verbose': 0}
 FEATURE_CONFIG = {'drop_columns': [], 'scale_numeric': True}
