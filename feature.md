@@ -1,74 +1,119 @@
-# Feature Descriptions — Credit Card Default Prediction
+# Feature Descriptions — Home Credit Default Risk
 
 ## Dataset context
 
-Data from a Taiwanese bank covering 30,000 credit card clients, April-September 2005. Each row is one customer. Features include 6 months of payment history, bill statements, and demographics.
+Home Credit loan applications from the unbanked population. 307K applications, 120 features. Target is binary default (8% positive rate). Many applicants have thin/no credit bureau history, so the model must rely on alternative data.
 
-## Columns
+## Core financial features
 
-- **LIMIT_BAL**: Credit limit in NT dollars (New Taiwan Dollar). Ranges from 10,000 to 1,000,000. Higher limits generally indicate the bank trusts the customer more. No nulls.
+- **AMT_INCOME_TOTAL**: Applicant's total annual income. No nulls. Wide range ($25K to $100M+ outliers).
+- **AMT_CREDIT**: Credit amount of the loan. The total amount to be repaid.
+- **AMT_ANNUITY**: Monthly loan annuity — the regular payment amount. Some nulls.
+- **AMT_GOODS_PRICE**: Price of the goods being financed. For cash loans this may differ from AMT_CREDIT. Some nulls.
 
-- **SEX**: Numeric-encoded category. 1 = Male, 2 = Female. This is NOT a continuous variable — do not treat the numeric value as meaningful (2 is not "more" than 1). No nulls.
+## Loan characteristics
 
-- **EDUCATION**: Numeric-encoded category. 1 = Graduate school, 2 = University, 3 = High school, 4 = Others, 5 = Unknown, 6 = Unknown. Values 0, 5, 6 appear in the data and are unlabeled/unknown. This is NOT continuous — a value of 3 is not "1.5x more educated" than 2. No nulls.
+- **NAME_CONTRACT_TYPE**: "Cash loans" or "Revolving loans". Categorical. Cash loans have higher default rates.
 
-- **MARRIAGE**: Numeric-encoded category. 1 = Married, 2 = Single, 3 = Others. Value 0 also appears and is unlabeled. This is NOT continuous. No nulls.
+## Applicant demographics
 
-- **AGE**: Integer, customer's age in years. Ranges roughly 21-79. This IS continuous. No nulls.
+- **CODE_GENDER**: "M", "F", or "XNA" (unknown). Categorical.
+- **FLAG_OWN_CAR**: "Y" or "N". Categorical.
+- **FLAG_OWN_REALTY**: "Y" or "N". Categorical.
+- **CNT_CHILDREN**: Number of children. Integer 0-19.
+- **CNT_FAM_MEMBERS**: Family size. Float (includes decimals due to encoding).
+- **NAME_TYPE_SUITE**: Who accompanied the applicant. Categorical (Unaccompanied, Family, Spouse, etc.). Some nulls.
+- **NAME_INCOME_TYPE**: Income source. Categorical (Working, Commercial associate, Pensioner, State servant, etc.).
+- **NAME_EDUCATION_TYPE**: Education level. Categorical (Secondary, Higher education, Incomplete higher, etc.).
+- **NAME_FAMILY_STATUS**: Marital status. Categorical (Married, Single, Civil marriage, etc.).
+- **NAME_HOUSING_TYPE**: Housing situation. Categorical (House/apartment, With parents, Rented, etc.).
+- **OCCUPATION_TYPE**: Job type. Categorical with 18 values. ~30% null — missingness itself is informative (may indicate informal/undocumented employment).
 
-- **PAY_0**: Payment status in the most recent month (September 2005). Values: -2 = no consumption, -1 = paid in full, 0 = revolving credit (minimum payment made), 1 = payment delay of 1 month, 2 = payment delay of 2 months, ..., 8 = payment delay of 8 months. Despite being named PAY_0, this is the MOST RECENT month. Higher values = worse payment behavior. This is the single most predictive raw feature.
+## Time-based features (all negative, representing days before application)
 
-- **PAY_2**: Payment status in August 2005 (second most recent). Same encoding as PAY_0. Note: there is no PAY_1 in the dataset — the column naming skips from PAY_0 to PAY_2.
+- **DAYS_BIRTH**: Applicant's age in negative days (e.g., -10000 ≈ 27 years old). Divide by -365 to get age in years. No nulls.
+- **DAYS_EMPLOYED**: Days employed at current job (negative). **CRITICAL: value 365243 is a sentinel meaning NOT employed/retired/unknown — do NOT treat as numeric.** ~18% of rows have this sentinel. All other values are negative.
+- **DAYS_REGISTRATION**: Days since registration (negative). How long ago the applicant changed their registration.
+- **DAYS_ID_PUBLISH**: Days since ID document was published (negative).
+- **DAYS_LAST_PHONE_CHANGE**: Days since last phone change (negative). Some nulls.
 
-- **PAY_3**: Payment status in July 2005. Same encoding.
+## Vehicle
 
-- **PAY_4**: Payment status in June 2005. Same encoding.
+- **OWN_CAR_AGE**: Age of applicant's car in years. Only populated if FLAG_OWN_CAR="Y". ~66% null.
 
-- **PAY_5**: Payment status in May 2005. Same encoding.
+## Contact flags
 
-- **PAY_6**: Payment status in April 2005 (oldest month). Same encoding.
+- **FLAG_MOBIL**: Has mobile phone (1/0). Almost all are 1.
+- **FLAG_EMP_PHONE**: Has employer phone (1/0).
+- **FLAG_WORK_PHONE**: Has work phone (1/0).
+- **FLAG_CONT_MOBILE**: Is mobile phone reachable (1/0).
+- **FLAG_PHONE**: Has home phone (1/0).
+- **FLAG_EMAIL**: Has email (1/0).
 
-- **BILL_AMT1**: Bill statement amount in September 2005 (most recent) in NT dollars. Can be negative (credit balance / overpayment). No nulls.
+## External credit scores
 
-- **BILL_AMT2**: Bill statement amount in August 2005. Same encoding.
+- **EXT_SOURCE_1**: External score from source 1. Float 0-1. ~56% null. Highly predictive but sparse.
+- **EXT_SOURCE_2**: External score from source 2. Float 0-1. ~0.3% null. Most complete external score.
+- **EXT_SOURCE_3**: External score from source 3. Float 0-1. ~20% null. Highly predictive.
 
-- **BILL_AMT3**: Bill statement amount in July 2005.
+These three scores are the single most important feature group. They're pre-computed risk scores from external credit bureaus. Missing values are informative — missing scores often indicate thin credit files.
 
-- **BILL_AMT4**: Bill statement amount in June 2005.
+## Region features
 
-- **BILL_AMT5**: Bill statement amount in May 2005.
+- **REGION_POPULATION_RELATIVE**: Population of the region (normalized 0-0.07).
+- **REGION_RATING_CLIENT**: Rating of the region (1, 2, or 3). Higher = worse region.
+- **REGION_RATING_CLIENT_W_CITY**: Same but weighted by city.
+- **REG_REGION_NOT_LIVE_REGION**: 1 if registration region differs from living region.
+- **REG_REGION_NOT_WORK_REGION**: 1 if registration region differs from work region.
+- **LIVE_REGION_NOT_WORK_REGION**: 1 if living region differs from work region.
+- **REG_CITY_NOT_LIVE_CITY**: Same but at city level.
+- **REG_CITY_NOT_WORK_CITY**: Same.
+- **LIVE_CITY_NOT_WORK_CITY**: Same.
 
-- **BILL_AMT6**: Bill statement amount in April 2005 (oldest).
+## Housing quality features (~70% null)
 
-- **PAY_AMT1**: Amount paid in September 2005 in NT dollars. This is how much the customer actually paid toward their bill. Ranges from 0 to very large values. No nulls.
+These describe the applicant's building/apartment. Each feature comes in three variants:
+- **_AVG**: Average for the building
+- **_MODE**: Mode for the building
+- **_MEDI**: Median for the building
 
-- **PAY_AMT2**: Amount paid in August 2005.
+Features: APARTMENTS, BASEMENTAREA, YEARS_BEGINEXPLUATATION, YEARS_BUILD, COMMONAREA, ELEVATORS, ENTRANCES, FLOORSMAX, FLOORSMIN, LANDAREA, LIVINGAPARTMENTS, LIVINGAREA, NONLIVINGAPARTMENTS, NONLIVINGAREA.
 
-- **PAY_AMT3**: Amount paid in July 2005.
+Also: **TOTALAREA_MODE** — total area of the dwelling.
 
-- **PAY_AMT4**: Amount paid in June 2005.
+**The ~70% missingness is a signal** — applicants without housing data may be in informal housing or unable to provide documentation.
 
-- **PAY_AMT5**: Amount paid in May 2005.
+## Housing categorical
 
-- **PAY_AMT6**: Amount paid in April 2005 (oldest).
+- **FONDKAPREMONT_MODE**: Capital repair fund status. ~68% null.
+- **HOUSETYPE_MODE**: Type of house. ~70% null.
+- **WALLSMATERIAL_MODE**: Wall material. ~70% null.
+- **EMERGENCYSTATE_MODE**: Emergency state flag. ~70% null.
 
-- **default.payment.next.month**: Target variable. 1 = customer defaulted on their October 2005 payment, 0 = did not default. ~22% positive rate. Do NOT derive features from this column.
+## Social circle
 
-## Temporal structure
+- **OBS_30_CNT_SOCIAL_CIRCLE**: Number of observable social contacts (30-day window).
+- **DEF_30_CNT_SOCIAL_CIRCLE**: Number of contacts who defaulted (30-day window).
+- **OBS_60_CNT_SOCIAL_CIRCLE**: Same for 60-day window.
+- **DEF_60_CNT_SOCIAL_CIRCLE**: Same for 60-day window.
 
-The data has a clear time dimension across the 6 months:
+## Document flags
 
-```
-Oldest                                              Most recent
-PAY_6 → PAY_5 → PAY_4 → PAY_3 → PAY_2 → PAY_0
-BILL_AMT6 → BILL_AMT5 → BILL_AMT4 → BILL_AMT3 → BILL_AMT2 → BILL_AMT1
-PAY_AMT6 → PAY_AMT5 → PAY_AMT4 → PAY_AMT3 → PAY_AMT2 → PAY_AMT1
-```
+- **FLAG_DOCUMENT_2 through FLAG_DOCUMENT_21**: Binary flags (0/1) for whether each document type was provided. 20 document flags. Most are rarely 1. The *count* of documents provided and *which* are missing is more informative than individual flags.
 
-The suffix numbers are confusing: AMT1 is the most recent, AMT6 is the oldest. PAY_0 is the most recent, PAY_6 is the oldest. PAY_1 does not exist.
+## Credit bureau inquiries
 
-## Special value notes
+- **AMT_REQ_CREDIT_BUREAU_HOUR**: Number of credit bureau inquiries in the past hour.
+- **AMT_REQ_CREDIT_BUREAU_DAY**: Past day.
+- **AMT_REQ_CREDIT_BUREAU_WEEK**: Past week.
+- **AMT_REQ_CREDIT_BUREAU_MON**: Past month.
+- **AMT_REQ_CREDIT_BUREAU_QRT**: Past quarter.
+- **AMT_REQ_CREDIT_BUREAU_YEAR**: Past year.
 
-- PAY values of -2 and -1 are "good" (no consumption / paid in full). 0 is "okay" (revolving/minimum). 1+ is "bad" (delayed).
-- BILL_AMT can be negative when the customer has a credit balance (overpaid).
-- PAY_AMT of 0 means the customer made no payment that month — very concerning if combined with a positive BILL_AMT.
+Many recent inquiries (especially HOUR/DAY/WEEK) suggest the applicant is urgently seeking credit — a red flag.
+
+## Other
+
+- **WEEKDAY_APPR_PROCESS_START**: Day of week the application was filed. Categorical.
+- **HOUR_APPR_PROCESS_START**: Hour of day (0-23) the application was started.
+- **ORGANIZATION_TYPE**: Type of employer organization. Categorical with 57 unique values.

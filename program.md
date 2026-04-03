@@ -1,55 +1,61 @@
-# Program: Credit Card Default Prediction
+# Program: Home Credit Default Risk
 
 ## Business objective
 
-Predict which credit card customers will default on their next month's payment. The bank's collections team needs to **rank customers by default risk** to prioritize outreach — calling the highest-risk customers first reduces losses. Ranking quality matters more than a hard yes/no threshold.
+Predict which loan applicants will default on their loan. Home Credit serves the unbanked population — people with little or no traditional credit history. The goal is to **rank applicants by default risk** so the lender can approve more loans to creditworthy people while managing risk. Ranking quality (average_precision) matters more than a binary cutoff because the business adjusts interest rates and loan sizes based on risk tier.
 
 ## Business context and domain knowledge
 
-Credit card default is driven by a combination of financial stress, behavioral patterns, and customer demographics. The dataset contains 6 months of payment history (April-September 2005) for 30,000 Taiwanese credit card holders.
+### Why this is hard
+
+The applicants often have thin or nonexistent credit bureau files. Traditional credit scores don't work. The lender must infer creditworthiness from alternative data: employment history, housing situation, social connections, and the application itself.
 
 ### Key default drivers
 
-1. **Payment delay history**: The single strongest predictor. A customer who has been 2+ months late in recent months is far more likely to default than one who pays on time. Recent delays (PAY_0, the most recent month) matter more than older delays (PAY_6).
+1. **External credit scores (EXT_SOURCE_1/2/3)**: These are scores from external data sources — the single most predictive features. They're pre-computed risk scores, but they have significant missing values. The *combination* and *agreement* between scores matters (all three low = very high risk; mixed signals = moderate risk).
 
-2. **Trend in payment behavior**: A customer whose delays are *increasing* month over month (e.g., PAY_6=0, PAY_5=0, PAY_4=1, PAY_3=2) is actively deteriorating. A customer whose delays are *decreasing* is recovering. The slope of the payment delay over 6 months is more predictive than any single month.
+2. **Debt burden**: The ratio of the loan annuity (AMT_ANNUITY) to income (AMT_INCOME_TOTAL) is critical. Also: credit amount relative to goods price (how much is financed vs. the actual value), and credit amount relative to income.
 
-3. **Credit utilization**: How much of their credit limit they're using. A customer with BILL_AMT near LIMIT_BAL is maxed out — financially stressed. Low utilization suggests financial headroom.
+3. **Employment stability**: DAYS_EMPLOYED measures how long the applicant has been at their current job (negative = days before application). Very short employment or anomalous values (365243 = unemployed/retired, a known sentinel) are strong signals.
 
-4. **Repayment ratio**: How much of the bill they actually pay each month (PAY_AMT / BILL_AMT). Customers who pay the minimum or less are high risk. Customers who pay in full are low risk. The ratio matters more than the absolute amounts.
+4. **Age and life stage**: DAYS_BIRTH (negative, days before application). Younger applicants default more. The interaction between age and loan amount matters — young person taking a large loan = high risk.
 
-5. **Repayment trend**: Is the customer paying a shrinking percentage of their bill each month? If PAY_AMT/BILL_AMT is declining over the 6 months, they're running out of capacity to pay.
+5. **Document completeness**: FLAG_DOCUMENT_* columns indicate which documents were provided. The *number* of documents submitted and *which specific ones* are missing correlate with default risk. Missing documents may indicate inability to provide proof of income/employment.
 
-6. **Demographics interact with behavior**: Young, less-educated customers with high utilization are highest risk. But demographics alone are weak predictors — they only matter in combination with payment behavior.
+6. **Housing information**: The APARTMENTS/LIVINGAREA/BASEMENTAREA columns (with _AVG/_MODE/_MEDI suffixes) describe the applicant's housing. Heavy missingness (~70%) is itself a signal — missing housing data correlates with higher default rates.
+
+7. **Social circle defaults**: DEF_30_CNT_SOCIAL_CIRCLE and DEF_60_CNT_SOCIAL_CIRCLE count how many people in the applicant's social circle have defaulted. Social risk contagion is real.
+
+8. **Credit bureau inquiries**: AMT_REQ_CREDIT_BUREAU_* columns count how many times the applicant's credit was checked. Many recent inquiries (HOUR, DAY, WEEK) suggest desperation for credit — a red flag.
 
 ### Known high-risk profiles
 
-- **Spiral Defaulter**: PAY_0 >= 2 (2+ months late now), and delays have been increasing over the past 6 months. They're in a debt spiral.
-- **Maxed-Out Minimum Payer**: BILL_AMT close to LIMIT_BAL, and PAY_AMT << BILL_AMT consistently. They're paying minimums on a maxed card.
-- **Recent Shock**: Previously good payment history (PAY_3 through PAY_6 all -1 or 0) but recent deterioration (PAY_0 or PAY_2 >= 1). Something changed — job loss, medical event.
-- **Chronic Late Payer**: Moderate delays every month (PAY consistently 1-2) but never catches up. Always behind but not yet in full default.
+- **Young, low-income, high credit**: DAYS_BIRTH > -10000 (under ~27), AMT_INCOME_TOTAL < median, AMT_CREDIT > 2x income. Over-leveraged young borrower.
+- **Unstable employment, no car, no realty**: DAYS_EMPLOYED > -365 (less than 1 year), FLAG_OWN_CAR=N, FLAG_OWN_REALTY=N. No asset backing, short employment.
+- **Low external scores with missing data**: EXT_SOURCE_2 < 0.3, EXT_SOURCE_3 missing. Thin credit file with bad scores.
+- **High bureau inquiries + cash loan**: AMT_REQ_CREDIT_BUREAU_MON > 3, NAME_CONTRACT_TYPE=Cash loans. Actively seeking credit from multiple lenders.
+- **Social circle with defaults**: DEF_30_CNT_SOCIAL_CIRCLE > 0. People they know have defaulted — social risk factor.
 
 ### Feature engineering hints
 
-- **Payment delay trend**: Slope of [PAY_6, PAY_5, PAY_4, PAY_3, PAY_2, PAY_0] — is it rising (getting worse) or falling (improving)?
-- **Average delay**: Mean of PAY_0 through PAY_6 captures overall payment discipline
-- **Max delay**: The worst single-month delay in the 6-month window
-- **Utilization ratios**: BILL_AMT1/LIMIT_BAL (current), BILL_AMT6/LIMIT_BAL (6 months ago)
-- **Repayment ratios**: PAY_AMT1/BILL_AMT1 (how much of last bill was paid)
-- **Repayment trend**: Slope of [PAY_AMT6/BILL_AMT6, ..., PAY_AMT1/BILL_AMT1]
-- **Balance growth**: BILL_AMT1 - BILL_AMT6 (is their balance growing?)
-- **Payment consistency**: Std dev of PAY_AMT values (erratic payers are riskier)
-- **Months with any delay**: Count of months where PAY > 0
-- **SEX, EDUCATION, MARRIAGE are numeric-encoded categories**, not continuous values — treat them as categorical or create meaningful interaction terms
+- **Debt ratios**: AMT_ANNUITY/AMT_INCOME_TOTAL (debt-to-income), AMT_CREDIT/AMT_GOODS_PRICE (loan-to-value), AMT_CREDIT/AMT_INCOME_TOTAL (credit-to-income)
+- **External score combinations**: mean of available EXT_SOURCE, count of missing EXT_SOURCE, product of EXT_SOURCE scores, max-min spread
+- **Age and employment derived**: age in years from DAYS_BIRTH, employment years from DAYS_EMPLOYED, employment-to-age ratio (how much of their life they've worked), flag for DAYS_EMPLOYED=365243 sentinel
+- **Document completeness score**: count of FLAG_DOCUMENT_* that are 1
+- **Housing data completeness**: count of non-null housing columns (APARTMENTS_AVG, LIVINGAREA_AVG, etc.)
+- **Credit bureau pressure**: sum of recent inquiries (HOUR + DAY + WEEK), ratio of recent to yearly
+- **Income per family member**: AMT_INCOME_TOTAL / CNT_FAM_MEMBERS
+- **Annuity burden per family**: AMT_ANNUITY / CNT_FAM_MEMBERS
+- **Region risk**: REGION_RATING_CLIENT interaction with income and credit amount
 
 ## Dataset
 
-- **source**: `huggingface`
-- **hf_dataset**: `scikit-learn/credit-card-clients`
-- **bundle_name**: `credit_default`
-- **target_column**: `default.payment.next.month`
+- **source**: `csv`
+- **csv_path**: `/tmp/home_credit/application_train.csv`
+- **bundle_name**: `home_credit`
+- **target_column**: `TARGET`
 - **positive_label**: `1`
-- **drop_columns**: `ID`
+- **drop_columns**: `SK_ID_CURR` (application ID, no predictive value)
 
 ## Model families to evaluate
 
