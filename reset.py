@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Reset train.py experiment block to its default starting state.
+"""Reset train.py experiment block and feature.py to their default states.
 
 Run this once before starting a new research task on a different dataset.
 Do NOT run this during an active search loop — it would erase the agent's
-current best configuration.
+current best configuration and engineered features.
 
 Usage:
-    python3 reset.py              # reset train.py only
+    python3 reset.py              # reset train.py + feature.py
     python3 reset.py --program    # also reset program.md to the blank template
 """
 from __future__ import annotations
@@ -17,6 +17,7 @@ from pathlib import Path
 
 TRAIN_PATH = Path(__file__).parent / 'train.py'
 PROGRAM_PATH = Path(__file__).parent / 'program.md'
+FEATURE_PATH = Path(__file__).parent / 'feature.py'
 
 # The default experiment block that ships with the repo.
 # This must match the content between the === markers in a clean train.py.
@@ -146,6 +147,69 @@ def reset_train(path: Path) -> bool:
     return True
 
 
+DEFAULT_FEATURE_PY = """\
+#!/usr/bin/env python3
+\"\"\"Feature engineering module for AutoResearch.
+
+The LLM agent edits the `engineer_features` function below to add,
+modify, or remove derived features. This function is called on every
+data split (train, val, test) before the target column is separated.
+
+Rules:
+  - The function receives the FULL dataframe INCLUDING the target column.
+  - Do NOT modify or drop the target column.
+  - The function must be idempotent — safe to call on any split.
+  - Handle missing columns gracefully (use `if col in df.columns` guards).
+  - New features should be numeric or categorical (object dtype).
+    The existing ColumnTransformer in train.py handles both paths.
+  - To drop original columns, either drop them here or add them to
+    FEATURE_CONFIG['drop_columns'] in train.py.
+\"\"\"
+from __future__ import annotations
+
+import numpy as np
+import pandas as pd
+
+
+def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+    \"\"\"Transform raw features into model-ready features.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Raw dataframe including all original columns and the target.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataframe with engineered features added (and optionally
+        original columns removed).
+    \"\"\"
+    df = df.copy()
+
+    # === Agent edits below this line ===
+
+    # Default: passthrough (no engineered features)
+
+    # === Agent edits above this line ===
+
+    return df
+"""
+
+
+def reset_feature(path: Path) -> bool:
+    """Reset feature.py to the default passthrough. Returns True if changed."""
+    if path.exists():
+        current = path.read_text()
+        if current.strip() == DEFAULT_FEATURE_PY.strip():
+            print(f'{path.name}: already at default state, no changes needed.')
+            return False
+
+    path.write_text(DEFAULT_FEATURE_PY)
+    print(f'{path.name}: reset to default passthrough.')
+    return True
+
+
 def reset_program(path: Path) -> bool:
     """Reset program.md to the blank template. Returns True if changed."""
     if path.exists():
@@ -168,13 +232,15 @@ def main() -> None:
     args = parser.parse_args()
 
     changed = reset_train(TRAIN_PATH)
+    changed = reset_feature(FEATURE_PATH) or changed
     if args.program:
         changed = reset_program(PROGRAM_PATH) or changed
 
     if changed:
         print('\nReset complete. Next steps:')
         print('  1. Fill in program.md with your new task configuration')
-        print('  2. Point your agent at the repo to start a new research run')
+        print('  2. Fill in feature.md with column descriptions for your dataset')
+        print('  3. Point your agent at the repo to start a new research run')
     else:
         print('\nEverything is already at default state.')
 

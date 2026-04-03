@@ -83,6 +83,16 @@ def get_git_sha() -> Optional[str]:
         return None
 
 
+def _hash_feature_py() -> Optional[str]:
+    """Return a short hash of feature.py for experiment tracking."""
+    import hashlib
+    feature_path = Path(__file__).parent / 'feature.py'
+    if feature_path.exists():
+        content = feature_path.read_text()
+        return hashlib.sha256(content.encode()).hexdigest()[:12]
+    return None
+
+
 def load_bundle(bundle_root: Path, bundle_name: str) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     bundle_dir = bundle_root / bundle_name
     if not bundle_dir.exists():
@@ -564,6 +574,12 @@ def maybe_log_mlflow(mlflow_mod, payload: dict[str, Any], output_dir: Path,
 def main() -> None:
     args = parse_args()
     train_df, val_df, test_df, metadata = load_bundle(args.bundle_root, args.bundle_name)
+
+    from feature import engineer_features
+    train_df = engineer_features(train_df)
+    val_df = engineer_features(val_df)
+    test_df = engineer_features(test_df)
+
     target_col = metadata['target_column']
     random_state = int(metadata['split']['random_state'])
     primary_metric_name = metadata['primary_metric']
@@ -638,6 +654,7 @@ def main() -> None:
         'test_metrics': metrics if args.finalize else {},
         'warning': warning,
         'git_sha': get_git_sha(),
+        'feature_engineering_hash': _hash_feature_py(),
         'finalize': bool(args.finalize),
         'artifact_pipeline': pipeline,
     }

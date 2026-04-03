@@ -28,6 +28,8 @@ def main() -> None:
     model_path = output_dir / 'runs' / last_run['run_id'] / 'model.joblib'
     pipeline = joblib.load(model_path)
     df = pd.read_csv(args.csv_path)
+    from feature import engineer_features
+    df = engineer_features(df)
     drop_cols = last_run.get('feature_config', {}).get('drop_columns', [])
     X = df.drop(columns=drop_cols, errors='ignore')
     proba = pipeline.predict_proba(X)

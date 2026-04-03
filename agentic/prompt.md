@@ -7,9 +7,11 @@ tabular binary classification task.
 ## Files to read before acting
 
 1. `program.md` — the research task definition (dataset, metric, constraints)
-2. `prepare.py` — the data preparation harness (do not modify)
-3. `train.py` — the experiment file you will edit
-4. `bundles/<bundle_name>/metadata.json` — created by prepare.py, contains
+2. `feature.md` — business-context descriptions of dataset columns
+3. `feature.py` — feature engineering function (you edit this)
+4. `prepare.py` — the data preparation harness (do not modify)
+5. `train.py` — the experiment file you will edit
+6. `bundles/<bundle_name>/metadata.json` — created by prepare.py, contains
    trial policy and feature summary
 
 ## Phase 0: Data preparation
@@ -69,12 +71,98 @@ After running prepare.py, verify the bundle was created and read
    with CUDA support, lightgbm with GPU, catboost with GPU), install the
    relevant packages before running experiments.
 
-## Phase 2: Search loop
+## Phase 2: Feature engineering
+
+### What you edit
+
+Only the `engineer_features` function body in `feature.py` (between the
+`=== Agent edits` comment markers). You may also add imports at the top
+of `feature.py` if needed (pandas, numpy, and stdlib only).
+
+During this phase, set the experiment block in `train.py` to use LightGBM
+with defaults as the fixed testbed model. Do NOT change the model during
+feature engineering — you are isolating the effect of features.
+
+### Preparation
+
+1. Read `feature.md` for business-context descriptions of each column.
+   If `feature.md` is empty or missing, use `metadata.json` feature_summary
+   and inspect a few rows of `bundles/<bundle_name>/train.csv` instead.
+2. Read `bundles/<bundle_name>/metadata.json` → `feature_summary` to see
+   column names, dtypes, and counts.
+3. Note the target column name from `metadata.json` → `target_column`.
+   You must NEVER create features derived from this column.
+
+### Feature engineering protocol
+
+**Strategy: Establish strong features first with a default gradient boosting
+model. Then lock features and tune models in Phase 3.**
+
+1. Set `train.py` experiment block to LightGBM defaults. Run with
+   passthrough `feature.py`. This establishes what raw features alone
+   can achieve.
+2. Read `feature.md` and reason about the business problem and column
+   relationships. Based on that understanding, explore:
+   - **Direct features**: type corrections (string→numeric), missing
+     value flags, binary recoding
+   - **Derived features**: ratios (charges/tenure), differences
+     (new_balance - old_balance), products, log transforms
+   - **Interaction features**: combining columns that together are more
+     predictive (contract_type + tenure → churn risk segment)
+   - **Aggregation features**: counts across related columns (e.g.,
+     number of services subscribed), sums, means of feature groups
+   - **Domain flags**: business-logic indicators (is_new_customer,
+     is_high_value, has_multiple_services) driven by feature.md context
+   - **Binning/discretization**: `pd.cut`/`pd.qcut` for continuous
+     variables where thresholds matter (e.g., tenure buckets)
+3. Edit `feature.py` with new features. Create as many as the business
+   context justifies — there is no fixed limit per round. Run `train.py`.
+   Compare to best so far.
+4. Read results. Reason about what features helped or hurt. Keep winners,
+   remove losers.
+5. Iterate until `max_consecutive_non_improvements` consecutive rounds
+   show no improvement. There is no fixed round limit — keep going as
+   long as features are improving the primary metric.
+6. Allocate roughly 40-50% of `max_total_trials` for feature engineering.
+   Feature engineering trials count toward the total trial budget.
+7. When features are stable, lock `feature.py` and proceed to Phase 3.
+
+### Rules for feature.py
+
+- **Never modify the target column.** Do not create features derived
+  FROM the target — that is data leakage.
+- **Guard against missing columns.** Wrap each feature in:
+  ```python
+  if 'col_name' in df.columns:
+      df['new_feature'] = ...
+  ```
+  This ensures the function works on train, val, test, AND prediction
+  data (which may lack the target column).
+- **Keep it idempotent.** Running `engineer_features(df)` twice on the
+  same dataframe must produce the same result.
+- **Numeric or categorical output only.** The preprocessor routes numeric
+  columns through imputation + optional scaling, and categorical columns
+  through imputation + one-hot encoding.
+- **Handle NaN explicitly.** If a computation can produce NaN (division
+  by zero, missing values), fill it with `fillna()`.
+- **Stick to pandas, numpy, and stdlib.** Do not use sklearn transformers
+  in `feature.py` — those belong in the train.py pipeline.
+
+### Dropping columns
+
+Two approaches:
+1. In `feature.py`: `df = df.drop(columns=['col'], errors='ignore')` —
+   use when replacing a column with an engineered version.
+2. In `train.py` `FEATURE_CONFIG['drop_columns']` — use for columns
+   that should simply be excluded (e.g., ID columns).
+
+## Phase 3: Search loop
 
 ### What you edit
 
 Only the experiment block at the top of `train.py` (lines between the
-`===` comment markers):
+`===` comment markers). Do NOT edit `feature.py` during Phase 3 —
+feature engineering belongs in Phase 2 only.
 
 - `EXPERIMENT_NAME` — short identifier for this hypothesis
 - `EXPERIMENT_DESCRIPTION` — what you are testing and why
@@ -103,6 +191,10 @@ stop after one run, after baselines, or after a few iterations because a
 result "looks good." The search is governed by termination conditions
 defined in `bundles/<bundle_name>/metadata.json` under `trial_policy`.
 Read these values before your first experiment and enforce them strictly.
+
+**Trial budget:** `max_total_trials` is shared between Phase 2 (feature
+engineering) and Phase 3 (model search). Count ALL trials from both
+phases toward this limit.
 
 **Before starting:** Read `metadata.json` and note these values:
 - `max_total_trials` — you must keep running experiments until you hit this
@@ -147,6 +239,12 @@ For each experiment in the loop:
 
 - Baseline every model family listed in `program.md` at least once with
   default parameters before tuning any family.
+- Rank families by primary metric after baselines. Focus configuration
+  tuning on the top 3 families — split the remaining trial budget
+  evenly across them.
+- Each configuration tuning round can change any part of the experiment
+  block: model parameters, feature config (scaling, column drops),
+  threshold strategy, class weighting — the full model configuration.
 - Give each family at least `min_trials_per_family` experiments before
   pruning it.
 - Stop allocating trials to a family if it hits
