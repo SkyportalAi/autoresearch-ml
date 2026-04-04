@@ -119,6 +119,29 @@ Pick a data source:
 - **positive_label**: `1`
 ```
 
+**Kaggle competition:**
+```markdown
+- **source**: `kaggle`
+- **kaggle_competition**: `home-credit-default-risk`
+- **kaggle_file**: `application_train.csv`
+- **bundle_name**: `home_credit`
+- **target_column**: `TARGET`
+- **positive_label**: `1`
+```
+
+**Kaggle dataset:**
+```markdown
+- **source**: `kaggle`
+- **kaggle_dataset**: `uciml/default-of-credit-card-clients`
+- **kaggle_file**: `UCI_Credit_Card.csv`
+- **bundle_name**: `credit_card`
+- **target_column**: `default.payment.next.month`
+```
+
+> **Kaggle prerequisites:** `pip3 install kaggle` and set up credentials
+> (place `kaggle.json` at `~/.kaggle/` or set `KAGGLE_API_TOKEN` env var).
+> For competitions, accept the rules on Kaggle's website first.
+
 Choose which model families to evaluate, set your primary metric, and
 optionally adjust search constraints. See the template comments for details.
 
@@ -169,10 +192,12 @@ Set via environment variable or `preferred_backend` in `program.md`.
 
 | Source | Flag | Required args |
 |--------|------|---------------|
-| Built-in demo | `--source demo --dataset-name <name>` | `breast_cancer` or `bank_marketing` |
+| Built-in demo | `--source demo --dataset-name <name>` | `breast_cancer`, `bank_marketing`, or `home_credit` |
 | Local CSV | `--source csv --csv-path <path>` | `--target-column` |
 | Public URL | `--source url --data-url <url>` | `--target-column` |
 | Hugging Face | `--source huggingface --hf-dataset <name>` | `--target-column` |
+| Kaggle | `--source kaggle --kaggle-competition <slug>` | `--kaggle-file`, `--target-column` |
+| Kaggle dataset | `--source kaggle --kaggle-dataset <owner/name>` | `--kaggle-file`, `--target-column` |
 
 ## Search constraints
 

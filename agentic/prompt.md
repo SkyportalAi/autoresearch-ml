@@ -38,6 +38,9 @@ Map values from `program.md` to CLI arguments as follows:
 | hf_dataset                          | `--hf-dataset`                         |
 | hf_config                           | `--hf-config`                          |
 | hf_split                            | `--hf-split`                           |
+| kaggle_competition                  | `--kaggle-competition`                 |
+| kaggle_dataset                      | `--kaggle-dataset`                     |
+| kaggle_file                         | `--kaggle-file`                        |
 | target_column                       | `--target-column`                      |
 | positive_label                      | `--positive-label`                     |
 | drop_columns                        | `--drop-columns`                       |
@@ -54,7 +57,7 @@ Only include arguments whose values are explicitly set in `program.md`.
 Omitted fields will use prepare.py defaults.
 
 For the `demo` source, `--target-column` and `--positive-label` are
-auto-configured by prepare.py for known datasets (breast_cancer,
+auto-configured by prepare.py for known datasets (breast_cancer, home_credit,
 bank_marketing). For `csv`, `url`, and `huggingface` sources, these
 must be provided in `program.md` and passed as arguments.
 

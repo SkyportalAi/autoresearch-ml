@@ -38,6 +38,9 @@ class PrepareConfig:
     hf_dataset: Optional[str]
     hf_config: Optional[str]
     hf_split: Optional[str]
+    kaggle_competition: Optional[str]
+    kaggle_dataset: Optional[str]
+    kaggle_file: Optional[str]
     target_column: Optional[str]
     positive_label: Optional[str]
     test_size: float
@@ -61,15 +64,18 @@ class PrepareConfig:
 
 def parse_args() -> PrepareConfig:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--source', choices=['demo', 'csv', 'url', 'huggingface'], required=True)
+    p.add_argument('--source', choices=['demo', 'csv', 'url', 'huggingface', 'kaggle'], required=True)
     p.add_argument('--bundle-name', required=True)
     p.add_argument('--bundle-root', type=Path, default=DEFAULT_BUNDLE_ROOT)
-    p.add_argument('--dataset-name', choices=['breast_cancer', 'bank_marketing'], default='breast_cancer')
+    p.add_argument('--dataset-name', choices=['breast_cancer', 'bank_marketing', 'home_credit'], default='breast_cancer')
     p.add_argument('--csv-path', type=Path, default=None)
     p.add_argument('--data-url', default=None, help='Public URL to a CSV or ZIP containing a CSV')
     p.add_argument('--hf-dataset', default=None)
     p.add_argument('--hf-config', default=None)
     p.add_argument('--hf-split', default='train')
+    p.add_argument('--kaggle-competition', default=None, help='Kaggle competition slug (e.g., home-credit-default-risk)')
+    p.add_argument('--kaggle-dataset', default=None, help='Kaggle dataset slug (e.g., uciml/default-of-credit-card-clients)')
+    p.add_argument('--kaggle-file', default=None, help='Specific file to download from competition/dataset')
     p.add_argument('--target-column', default=None)
     p.add_argument('--positive-label', default=None)
     p.add_argument('--test-size', type=float, default=0.20)
@@ -100,9 +106,13 @@ def parse_args() -> PrepareConfig:
     elif args.source == 'demo' and args.dataset_name == 'breast_cancer':
         target_column = 'target'
         positive_label = '1'
+    elif args.source == 'demo' and args.dataset_name == 'home_credit':
+        target_column = 'TARGET'
+        positive_label = '1'
+        args.drop_columns = list(args.drop_columns) + ['SK_ID_CURR']
     else:
         if not target_column:
-            p.error('--target-column is required for csv, url, and huggingface sources')
+            p.error('--target-column is required for csv, url, huggingface, and kaggle sources')
 
     if args.source == 'csv' and not args.csv_path:
         p.error('--csv-path is required when --source csv')
@@ -110,6 +120,11 @@ def parse_args() -> PrepareConfig:
         p.error('--data-url is required when --source url')
     if args.source == 'huggingface' and not args.hf_dataset:
         p.error('--hf-dataset is required when --source huggingface')
+    if args.source == 'kaggle':
+        if not args.kaggle_competition and not args.kaggle_dataset:
+            p.error('--kaggle-competition or --kaggle-dataset is required when --source kaggle')
+        if args.kaggle_competition and not args.kaggle_file:
+            p.error('--kaggle-file is required for Kaggle competitions (they contain multiple files)')
 
     return PrepareConfig(
         source=args.source,
@@ -121,6 +136,9 @@ def parse_args() -> PrepareConfig:
         hf_dataset=args.hf_dataset,
         hf_config=args.hf_config,
         hf_split=args.hf_split,
+        kaggle_competition=args.kaggle_competition,
+        kaggle_dataset=args.kaggle_dataset,
+        kaggle_file=args.kaggle_file,
         target_column=target_column,
         positive_label=positive_label,
         test_size=args.test_size,
@@ -189,6 +207,8 @@ def load_demo_dataset(name: str) -> pd.DataFrame:
         return ds.frame.copy()
     if name == 'bank_marketing':
         return load_bank_marketing()
+    if name == 'home_credit':
+        return load_kaggle_dataset('home-credit-default-risk', None, 'application_train.csv')
     raise ValueError(f'Unsupported demo dataset: {name}')
 
 
@@ -222,6 +242,51 @@ def load_huggingface_dataset(name: str, config_name: Optional[str], split: str) 
     return ds.to_pandas()
 
 
+def load_kaggle_dataset(competition: Optional[str], dataset: Optional[str], file: Optional[str]) -> pd.DataFrame:
+    try:
+        from kaggle.api.kaggle_api_extended import KaggleApi
+    except ImportError:
+        raise ImportError(
+            "Kaggle source requires `pip install kaggle` and credentials.\n"
+            "Set KAGGLE_API_TOKEN env var or place kaggle.json at ~/.kaggle/kaggle.json.\n"
+            "For competitions, accept the rules on Kaggle's website first."
+        )
+
+    api = KaggleApi()
+    api.authenticate()
+
+    with TemporaryDirectory() as tmpdir:
+        if competition:
+            api.competition_download_file(competition, file, path=tmpdir)
+        else:
+            api.dataset_download_file(dataset, file, path=tmpdir)
+
+        downloaded = Path(tmpdir) / file
+        # Kaggle may wrap downloads in zip even when the filename is .csv
+        if not downloaded.exists():
+            for zp in Path(tmpdir).glob('*.zip'):
+                with zipfile.ZipFile(zp) as zf:
+                    zf.extractall(tmpdir)
+        if downloaded.exists() and zipfile.is_zipfile(downloaded):
+            extract_dir = Path(tmpdir) / '_extracted'
+            extract_dir.mkdir()
+            with zipfile.ZipFile(downloaded) as zf:
+                zf.extractall(extract_dir)
+            extracted_csv = extract_dir / file
+            if extracted_csv.exists():
+                downloaded = extracted_csv
+            else:
+                csvs = list(extract_dir.glob('*.csv'))
+                if csvs:
+                    downloaded = csvs[0]
+        if not downloaded.exists():
+            raise FileNotFoundError(
+                f'Expected file {file} not found after download. '
+                f'Contents: {list(Path(tmpdir).iterdir())}'
+            )
+        return pd.read_csv(downloaded)
+
+
 def load_source(cfg: PrepareConfig) -> pd.DataFrame:
     if cfg.source == 'demo':
         return load_demo_dataset(cfg.dataset_name)
@@ -231,6 +296,8 @@ def load_source(cfg: PrepareConfig) -> pd.DataFrame:
         return load_public_url(cfg.data_url)
     if cfg.source == 'huggingface':
         return load_huggingface_dataset(cfg.hf_dataset, cfg.hf_config, cfg.hf_split)
+    if cfg.source == 'kaggle':
+        return load_kaggle_dataset(cfg.kaggle_competition, cfg.kaggle_dataset, cfg.kaggle_file)
     raise ValueError(f'Unsupported source: {cfg.source}')
 
 
