@@ -94,6 +94,33 @@ feature engineering — you are isolating the effect of features.
 3. Note the target column name from `metadata.json` → `target_column`.
    You must NEVER create features derived from this column.
 
+### Mandatory data audit
+
+Before writing any features, audit the training data. These steps are
+dataset-agnostic — do them regardless of the business domain.
+
+1. **High-cardinality categoricals**: Identify categorical columns
+   with >10 unique values (from metadata.json feature_summary). For
+   each, create a frequency-encoded version:
+   `df[col + '_freq'] = df.groupby(col)[col].transform('count')`
+   If >50 unique values, group rare categories (count < 1% of rows)
+   into 'Other' before one-hot encoding.
+
+2. **Missingness flags**: For columns with >5% missing values, create
+   a binary indicator: `df[col + '_missing'] = df[col].isna().astype(int)`.
+   Check feature.md for whether missingness has a known meaning.
+
+3. **Column groups**: Identify columns that share naming patterns
+   (e.g., FLAG_*, AMT_*, *_AVG/*_MODE/*_MEDI). For each group, create
+   a count or sum aggregation. These groupings are visible from column
+   names alone — you don't need domain knowledge for this step.
+
+4. **Sentinel values**: Check feature.md for documented sentinel values
+   (e.g., special codes meaning "not applicable"). Replace sentinels
+   with NaN and create a flag column. If feature.md doesn't document
+   sentinels, scan numeric columns for suspiciously frequent constant
+   values.
+
 ### Feature engineering protocol
 
 **Strategy: Establish strong features first with a default gradient boosting
@@ -116,11 +143,38 @@ model. Then lock features and tune models in Phase 3.**
      is_high_value, has_multiple_services) driven by feature.md context
    - **Binning/discretization**: `pd.cut`/`pd.qcut` for continuous
      variables where thresholds matter (e.g., tenure buckets)
+   - **Frequency encoding**: for categorical columns with many unique
+     values (>10), replace categories with their training-set count.
+     `df[col + '_freq'] = df.groupby(col)[col].transform('count')`
+   - **Missingness flags**: for columns with >5% nulls, add
+     `df[col + '_missing'] = df[col].isna().astype(int)`.
+     Check feature.md — missingness often has domain meaning.
 3. Edit `feature.py` with new features. Create as many as the business
    context justifies — there is no fixed limit per round. Run `train.py`.
    Compare to best so far.
-4. Read results. Reason about what features helped or hurt. Keep winners,
-   remove losers.
+4. **Feature importance feedback (mandatory after every round):**
+
+   After each experiment, extract feature importances from the trained
+   model. This is not optional.
+
+   ```python
+   import joblib
+   pipeline = joblib.load('outputs/<bundle>/runs/<run_id>/model.joblib')
+   model = pipeline.named_steps['model']
+   names = pipeline.named_steps['preprocessor'].get_feature_names_out()
+   importances = model.feature_importances_
+   # Sort and report top 10 and bottom 10
+   ```
+
+   a. Report the **top 10** and **bottom 10** features by importance.
+   b. **Remove** any engineered feature in the bottom 10% of all
+      features — it is adding noise, not signal.
+   c. **Amplify** features in the top 20 — if a ratio feature is
+      highly important, try crossing it with other strong features
+      or creating variants (squared, log, binned).
+   d. If **no engineered feature** appears in the top 20 after a
+      round, change your approach — don't add more of the same type
+      of feature.
 5. Iterate until `max_consecutive_non_improvements` consecutive rounds
    show no improvement. There is no fixed round limit — keep going as
    long as features are improving the primary metric.
