@@ -84,12 +84,28 @@ any domain-specific meaning of special values.
 
 Pick a data source:
 
-**Built-in demo dataset:**
+**Built-in demo datasets:**
+
+`breast_cancer` (569 rows, 30 features) and `bank_marketing` (45K rows,
+15 features) work out of the box — no external setup needed:
 ```markdown
 - **source**: `demo`
 - **dataset_name**: `bank_marketing`
 - **bundle_name**: `bank_marketing`
 ```
+
+`home_credit` (307K rows, 120 features) is the feature engineering
+showcase dataset — requires Kaggle credentials (see prerequisites below):
+```markdown
+- **source**: `demo`
+- **dataset_name**: `home_credit`
+- **bundle_name**: `home_credit`
+```
+
+> **Kaggle prerequisites (for `home_credit` demo):** `pip3 install kaggle`
+> and set `KAGGLE_API_TOKEN` env var or place `kaggle.json` at `~/.kaggle/`.
+> Accept the competition rules at
+> https://www.kaggle.com/competitions/home-credit-default-risk/rules
 
 **Local CSV:**
 ```markdown

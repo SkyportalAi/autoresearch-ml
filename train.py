@@ -547,6 +547,7 @@ def maybe_log_mlflow(mlflow_mod, payload: dict[str, Any], output_dir: Path,
             'model_family': payload['model_family'],
             'requested_backend': payload['requested_backend'],
             'actual_backend': payload['actual_backend'],
+            'feature_engineering_hash': payload.get('feature_engineering_hash', ''),
             **{f'model__{k}': v for k, v in payload['model_params'].items()},
             **{f'feature__{k}': v for k, v in payload['feature_config'].items()},
             **{f'threshold__{k}': v for k, v in payload['threshold_config'].items()},
@@ -557,6 +558,9 @@ def maybe_log_mlflow(mlflow_mod, payload: dict[str, Any], output_dir: Path,
         })
         run_dir = output_dir / 'runs' / payload['run_id']
         mlflow_mod.log_artifact(str(run_dir / 'summary.json'))
+        feature_py = Path('feature.py')
+        if feature_py.exists():
+            mlflow_mod.log_artifact(str(feature_py))
 
         if payload.get('finalize') and payload.get('artifact_pipeline') is not None:
             mlcfg = metadata.get('mlflow', {})
