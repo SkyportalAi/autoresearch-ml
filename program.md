@@ -50,12 +50,9 @@ The applicants often have thin or nonexistent credit bureau files. Traditional c
 
 ## Dataset
 
-- **source**: `csv`
-- **csv_path**: `/tmp/home_credit/application_train.csv`
+- **source**: `demo`
+- **dataset_name**: `home_credit`
 - **bundle_name**: `home_credit`
-- **target_column**: `TARGET`
-- **positive_label**: `1`
-- **drop_columns**: `SK_ID_CURR` (application ID, no predictive value)
 
 ## Model families to evaluate
 

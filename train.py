@@ -44,10 +44,10 @@ from sklearn.ensemble import RandomForestClassifier, ExtraTreesClassifier
 # Editable experiment block.
 # The external agent may change only this block during the search loop.
 # ============================================================================
-EXPERIMENT_NAME = 'winner_lgbm_63leaves'
-EXPERIMENT_DESCRIPTION = 'WINNER: LightGBM 63 leaves lr=0.03 + derived features'
-MODEL_FAMILY = 'lightgbm'
-MODEL_PARAMS = {'learning_rate': 0.03, 'n_estimators': 500, 'num_leaves': 63, 'reg_lambda': 1.0, 'subsample': 0.8}
+EXPERIMENT_NAME = 'baseline_logreg'
+EXPERIMENT_DESCRIPTION = 'Baseline logistic regression with defaults'
+MODEL_FAMILY = 'logistic_regression'
+MODEL_PARAMS = {'C': 1.0, 'max_iter': 2000}
 FEATURE_CONFIG = {'drop_columns': [], 'scale_numeric': True}
 THRESHOLD_CONFIG = {'strategy': 'best_f1', 'value': 0.5}
 
