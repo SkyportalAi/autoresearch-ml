@@ -242,13 +242,76 @@ def load_huggingface_dataset(name: str, config_name: Optional[str], split: str) 
     return ds.to_pandas()
 
 
+def _ensure_kaggle_api_token() -> None:
+    """Detect KGAT_ tokens in kaggle.json and set KAGGLE_API_TOKEN env var.
+
+    Both the ``kaggle`` and ``kagglehub`` libraries read ``~/.kaggle/kaggle.json``
+    and send the ``key`` value via HTTP Basic Auth.  The Kaggle server rejects
+    newer KGAT_ tokens over Basic Auth — they must be sent as Bearer tokens.
+    Setting ``KAGGLE_API_TOKEN`` causes the libraries to use Bearer auth instead.
+    """
+    if os.environ.get('KAGGLE_API_TOKEN'):
+        return  # already set, nothing to do
+
+    kaggle_json = Path.home() / '.kaggle' / 'kaggle.json'
+    if not kaggle_json.exists():
+        return
+
+    try:
+        import json as _json
+        creds = _json.loads(kaggle_json.read_text())
+        key = creds.get('key', '')
+        if key.startswith('KGAT_'):
+            os.environ['KAGGLE_API_TOKEN'] = key
+    except Exception:
+        pass  # let downstream auth handle the error
+
+
+def _resolve_kaggle_csv(base: Path, expected_file: str) -> Path:
+    """Locate the target CSV in a Kaggle download, handling zip wrapping."""
+    target = base / expected_file if base.is_dir() else base
+    # Kaggle may wrap downloads in zip even when the filename is .csv
+    if base.is_dir() and not target.exists():
+        for zp in base.glob('*.zip'):
+            with zipfile.ZipFile(zp) as zf:
+                zf.extractall(base)
+        target = base / expected_file
+    if target.exists() and zipfile.is_zipfile(target):
+        extract_dir = target.parent / '_extracted'
+        extract_dir.mkdir(exist_ok=True)
+        with zipfile.ZipFile(target) as zf:
+            zf.extractall(extract_dir)
+        extracted = extract_dir / expected_file
+        if extracted.exists():
+            return extracted
+        csvs = list(extract_dir.glob('*.csv'))
+        if csvs:
+            return csvs[0]
+    if base.is_dir() and not target.exists():
+        # Fallback: pick first CSV in the directory
+        csvs = list(base.glob('*.csv'))
+        if csvs:
+            return csvs[0]
+    if not target.exists():
+        contents = list(base.iterdir()) if base.is_dir() else [base]
+        raise FileNotFoundError(
+            f'Expected file {expected_file} not found after download. '
+            f'Contents: {contents}'
+        )
+    return target
+
+
 def load_kaggle_dataset(competition: Optional[str], dataset: Optional[str], file: Optional[str]) -> pd.DataFrame:
+    _ensure_kaggle_api_token()
+
     try:
         from kaggle.api.kaggle_api_extended import KaggleApi
     except ImportError:
         raise ImportError(
             "Kaggle source requires `pip install kaggle` and credentials.\n"
-            "Set KAGGLE_API_TOKEN env var or place kaggle.json at ~/.kaggle/kaggle.json.\n"
+            "Place kaggle.json at ~/.kaggle/kaggle.json or set "
+            "KAGGLE_API_TOKEN env var.\n"
+            "Both legacy (username/key) and KGAT_ token formats are supported.\n"
             "For competitions, accept the rules on Kaggle's website first."
         )
 
@@ -260,30 +323,7 @@ def load_kaggle_dataset(competition: Optional[str], dataset: Optional[str], file
             api.competition_download_file(competition, file, path=tmpdir)
         else:
             api.dataset_download_file(dataset, file, path=tmpdir)
-
-        downloaded = Path(tmpdir) / file
-        # Kaggle may wrap downloads in zip even when the filename is .csv
-        if not downloaded.exists():
-            for zp in Path(tmpdir).glob('*.zip'):
-                with zipfile.ZipFile(zp) as zf:
-                    zf.extractall(tmpdir)
-        if downloaded.exists() and zipfile.is_zipfile(downloaded):
-            extract_dir = Path(tmpdir) / '_extracted'
-            extract_dir.mkdir()
-            with zipfile.ZipFile(downloaded) as zf:
-                zf.extractall(extract_dir)
-            extracted_csv = extract_dir / file
-            if extracted_csv.exists():
-                downloaded = extracted_csv
-            else:
-                csvs = list(extract_dir.glob('*.csv'))
-                if csvs:
-                    downloaded = csvs[0]
-        if not downloaded.exists():
-            raise FileNotFoundError(
-                f'Expected file {file} not found after download. '
-                f'Contents: {list(Path(tmpdir).iterdir())}'
-            )
+        downloaded = _resolve_kaggle_csv(Path(tmpdir), file)
         return pd.read_csv(downloaded)
 
 

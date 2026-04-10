@@ -103,8 +103,8 @@ showcase dataset — requires Kaggle credentials (see prerequisites below):
 ```
 
 > **Kaggle prerequisites (for `home_credit` demo):** `pip3 install kaggle`
-> and set `KAGGLE_API_TOKEN` env var or place `kaggle.json` at `~/.kaggle/`.
-> Accept the competition rules at
+> and place `kaggle.json` at `~/.kaggle/` (both legacy username/key and
+> KGAT_ token formats are supported). Accept the competition rules at
 > https://www.kaggle.com/competitions/home-credit-default-risk/rules
 
 **Local CSV:**
@@ -155,7 +155,8 @@ showcase dataset — requires Kaggle credentials (see prerequisites below):
 ```
 
 > **Kaggle prerequisites:** `pip3 install kaggle` and set up credentials
-> (place `kaggle.json` at `~/.kaggle/` or set `KAGGLE_API_TOKEN` env var).
+> (place `kaggle.json` at `~/.kaggle/` — both legacy username/key and
+> KGAT_ token formats are supported).
 > For competitions, accept the rules on Kaggle's website first.
 
 Choose which model families to evaluate, set your primary metric, and
