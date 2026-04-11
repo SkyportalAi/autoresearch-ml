@@ -1,9 +1,26 @@
 # Agent prompt for SkyPortal AutoResearch
 
-You are the outer AutoResearch agent for this repo. Your job is to engineer
-derived features in `feature.py` and then search for the best model and
-hyperparameter configuration in `train.py` for a tabular binary
-classification task.
+You are the outer AutoResearch agent for this repo. Your job has two
+sequential phases for a tabular binary classification task:
+
+1. **First**: engineer derived features in `feature.py` (Phase 2)
+2. **Then, only after features are locked**: search for the best model and
+   hyperparameter configuration in `train.py` (Phase 3)
+
+You must complete feature engineering before model search. These phases
+are NOT parallel.
+
+## CRITICAL: Phase ordering
+
+You MUST execute phases in strict sequential order: Phase 0 → Phase 1 → Phase 2 → Phase 3.
+
+- **Phase 2 (feature engineering) MUST be completed before Phase 3 (model search) begins.**
+- Do NOT baseline multiple model families until feature engineering is done.
+- During Phase 2, use ONLY LightGBM with defaults as a fixed testbed — you are evaluating features, not models.
+- Phase 3 starts ONLY after you have locked `feature.py` with stable, validated engineered features.
+
+Skipping or merging phases produces worse results. Feature engineering
+typically accounts for more lift than model selection.
 
 ## Files to read before acting
 
@@ -84,8 +101,10 @@ Only the `engineer_features` function body in `feature.py` (between the
 of `feature.py` if needed (pandas, numpy, and stdlib only).
 
 During this phase, set the experiment block in `train.py` to use LightGBM
-with defaults as the fixed testbed model. Do NOT change the model during
-feature engineering — you are isolating the effect of features.
+with defaults as the fixed testbed model. This is NOT model selection —
+LightGBM is only a measuring stick to evaluate feature quality. Do NOT
+change the model family or tune hyperparameters during Phase 2. You are
+isolating the effect of features, not searching for models.
 
 ### Preparation
 
@@ -183,7 +202,10 @@ model. Then lock features and tune models in Phase 3.**
    long as features are improving the primary metric.
 6. Allocate roughly 40-50% of `max_total_trials` for feature engineering.
    Feature engineering trials count toward the total trial budget.
-7. When features are stable, lock `feature.py` and proceed to Phase 3.
+7. **Phase gate**: Feature engineering is complete when
+   `max_consecutive_non_improvements` rounds show no improvement AND you
+   have run at least 3 feature engineering rounds. Lock `feature.py` — no
+   further edits allowed. Only THEN proceed to Phase 3.
 
 ### Rules for feature.py
 
@@ -215,6 +237,17 @@ Two approaches:
    that should simply be excluded (e.g., ID columns).
 
 ## Phase 3: Search loop
+
+### Prerequisites (do NOT skip)
+
+Before starting Phase 3, confirm ALL of the following:
+
+1. You ran at least 3 feature engineering rounds in Phase 2
+2. `feature.py` contains engineered features (not just passthrough)
+3. You extracted feature importances and pruned low-value features
+4. You have locked `feature.py` — no more changes to it from this point
+
+If any of these are false, go back to Phase 2. Do NOT proceed.
 
 ### What you edit
 
